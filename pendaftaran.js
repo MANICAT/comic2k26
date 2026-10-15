@@ -313,9 +313,10 @@
     });
 
     const hint = document.getElementById("lombaHint");
-    hint.textContent = eligible.length === 0
+    state.baseHint = eligible.length === 0
       ? "Tidak ada lomba untuk jenjangmu."
       : open + " dari " + eligible.length + " lomba masih terbuka untuk jenjang " + state.session.level + ".";
+    hint.textContent = state.baseHint;
   }
 
   function bindStep1() {
@@ -370,13 +371,21 @@
 
     if (!v || !opt) {
       state.lomba = ""; state.isTeam = false;
-      fInd.hidden = true; fTim.hidden = true; pp.hidden = true; return;
+      fInd.hidden = true; fTim.hidden = true; pp.hidden = true;
+      document.getElementById("lombaHint").textContent = state.baseHint || "";
+      return;
     }
     const l = LOMBA_DATA.find(x => x.name === v && x.levels.includes(state.session.level));
     state.lomba = v; state.lombaPrice = l.price; state.isTeam = !!l.team;
 
     pAmt.textContent = "Rp " + l.price.toLocaleString("id-ID");
     pp.hidden = false;
+
+    // Info kuota: dihitung dari pendaftaran yang sudah masuk, jadi otomatis berkurang
+    const st = lombaStats(state.all, l, state.session.school);
+    document.getElementById("lombaHint").textContent = l.quota == null
+      ? l.name + ": kuota tidak dibatasi."
+      : l.name + ": " + st.count + " dari " + l.quota + " " + (l.team ? "tim" : "peserta") + " sudah mendaftar, sisa kuota " + st.left + ".";
 
     if (state.isTeam) {
       state.teamMin = l.team.min; state.teamMax = l.team.max; state.teamTotal = l.team.total;

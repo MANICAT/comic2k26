@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin · COMIC 2026</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Georgia, serif; background: #0e1318; color: #bfb49a; font-size: 14px; min-height: 100vh; }
+
+.login-wrap {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: radial-gradient(ellipse at center, #1a2028, #0b1014);
+}
+.login-box {
+  width: 100%; max-width: 400px;
+  background: linear-gradient(160deg, #232d38, #161d24);
+  border: 1px solid rgba(196,168,120,0.32);
+  border-radius: 6px; padding: 44px 36px 36px;
+  box-shadow: 0 26px 70px rgba(0,0,0,0.65);
+  position: relative;
+}
+.login-box::before {
+  content: ""; position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, #c4a878, transparent);
+}
+.login-box h1 { font-size: 22px; letter-spacing: 4px; color: #e8dcc4; text-align: center; margin-bottom: 6px; }
+.login-box .sub { text-align: center; font-style: italic; color: #9c9078; margin-bottom: 26px; font-size: 13px; }
+.login-box label { display: block; font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: #c4a878; margin-bottom: 7px; }
+.login-box input { width: 100%; padding: 12px 14px; margin-bottom: 16px; background: rgba(14,19,24,0.7); border: 1px solid rgba(180,160,120,0.2); border-radius: 3px; color: #e8dcc4; font-size: 15px; font-family: inherit; }
+.login-box input:focus { outline: none; border-color: #c4a878; box-shadow: 0 0 0 2px rgba(196,168,120,0.2); }
+.login-box button { width: 100%; padding: 14px; background: linear-gradient(135deg, #9c7e50, #c4a878, #9c7e50); border: none; border-radius: 3px; color: #1a1208; font-weight: 700; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; cursor: pointer; }
+.login-box button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 34px rgba(196,168,120,0.5); }
+.login-err { padding: 10px 14px; background: rgba(180,60,60,0.15); border: 1px solid rgba(180,60,60,0.5); color: #e8a0a0; border-radius: 3px; margin-bottom: 16px; font-size: 13px; text-align: center; display: none; }
+
+#dash { display: none; }
+header {
+  background: linear-gradient(180deg, #1a2028, #161d24);
+  border-bottom: 1px solid rgba(180,160,120,0.32);
+  padding: 16px 24px;
+  display: flex; justify-content: space-between; align-items: center;
+  position: sticky; top: 0; z-index: 10;
+}
+header h1 { font-size: 16px; letter-spacing: 3px; color: #e8dcc4; }
+header .right { display: flex; gap: 16px; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 2px; align-items: center; }
+header .right a { color: #e8a0a0; text-decoration: none; cursor: pointer; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; padding: 20px 24px; }
+.stat { background: linear-gradient(160deg, #232d38, #161d24); border: 1px solid rgba(180,160,120,0.16); border-left: 3px solid #c4a878; border-radius: 4px; padding: 14px 16px; }
+.stat .lbl { font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: #c4a878; margin-bottom: 6px; }
+.stat .val { font-size: 24px; color: #e8dcc4; font-weight: 600; }
+
+.toolbar { padding: 0 24px 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.toolbar input { padding: 9px 13px; background: rgba(14,19,24,0.7); border: 1px solid rgba(180,160,120,0.3); border-radius: 3px; color: #e8dcc4; font-family: inherit; font-size: 13px; flex: 1; min-width: 220px; }
+.toolbar input:focus { outline: none; border-color: #c4a878; }
+.pill { padding: 8px 14px; border: 1px solid rgba(180,160,120,0.3); border-radius: 20px; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #9c9078; cursor: pointer; background: transparent; }
+.pill.active { background: rgba(196,168,120,0.15); border-color: #c4a878; color: #e8dcc4; }
+.btn-danger { padding: 8px 14px; background: rgba(180,60,60,0.15); color: #e8a0a0; border: 1px solid rgba(180,60,60,0.5); border-radius: 3px; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; }
+.btn-danger:hover { background: rgba(180,60,60,0.3); }
+
+.wrap { padding: 0 24px 60px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; background: linear-gradient(160deg, #1a2028, #141a20); border: 1px solid rgba(180,160,120,0.16); border-radius: 4px; overflow: hidden; }
+th { padding: 11px 9px; text-align: left; background: rgba(35,45,56,0.9); font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #c4a878; border-bottom: 1px solid rgba(180,160,120,0.3); white-space: nowrap; }
+td { padding: 11px 9px; border-bottom: 1px solid rgba(180,160,120,0.16); vertical-align: top; font-size: 13px; }
+tr:hover td { background: rgba(196,168,120,0.03); }
+.badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
+.badge.pending { background: rgba(196,168,120,0.15); color: #e0c890; border: 1px solid rgba(196,168,120,0.4); }
+.badge.verified { background: rgba(90,160,120,0.15); color: #a0d4b8; border: 1px solid rgba(90,160,120,0.5); }
+.badge.rejected { background: rgba(180,60,60,0.15); color: #e8a0a0; border: 1px solid rgba(180,60,60,0.5); }
+.type-badge { display: inline-block; padding: 2px 7px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; margin-left: 4px; }
+.type-badge.team { background: rgba(140,90,180,0.2); color: #d0a8e8; border: 1px solid rgba(180,120,220,0.5); }
+.type-badge.indiv { background: rgba(80,140,180,0.2); color: #a8d0e8; border: 1px solid rgba(120,180,220,0.5); }
+.thumb { width: 56px; height: 72px; object-fit: cover; border-radius: 3px; border: 1px solid rgba(180,160,120,0.3); cursor: zoom-in; transition: .3s; }
+.thumb:hover { transform: scale(1.08); border-color: #c4a878; }
+.pdf-link { display: inline-block; padding: 20px 12px; color: #e8a0a0; font-family: 'Courier New', monospace; font-size: 10px; text-decoration: none; border: 1px solid rgba(180,60,60,0.5); border-radius: 3px; background: rgba(180,60,60,0.15); }
+.actions { display: flex; flex-direction: column; gap: 6px; }
+.actions button { padding: 6px 10px; border-radius: 3px; font-size: 10.5px; font-family: 'Courier New', monospace; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; border: 1px solid; background: transparent; }
+.actions .ok { color: #a0d4b8; border-color: rgba(90,160,120,0.6); }
+.actions .ok:hover { background: rgba(90,160,120,0.15); }
+.actions .no { color: #e8a0a0; border-color: rgba(180,60,60,0.6); }
+.actions .no:hover { background: rgba(180,60,60,0.15); }
+.empty { padding: 60px 20px; text-align: center; color: #7a705c; font-style: italic; }
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(6,8,12,0.85); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.active { display: flex; }
+.modal-box { background: #1a2028; border: 1px solid rgba(180,160,120,0.3); border-radius: 6px; padding: 24px; max-width: 720px; width: 100%; max-height: 90vh; overflow: auto; }
+.modal-box img { width: 100%; max-height: 70vh; object-fit: contain; border-radius: 4px; }
+.team-list { margin-top: 4px; font-size: 11.5px; color: #9c9078; line-height: 1.5; }
+.team-list strong { color: #c4a878; }
+
+.flag { margin-top: 6px; padding: 5px 8px; border-radius: 3px; background: rgba(180,60,60,0.15); border: 1px solid rgba(180,60,60,0.5); color: #e8a0a0; font-size: 11px; line-height: 1.4; max-width: 240px; white-space: normal; }
+.pay-info { margin-top: 6px; font-size: 11px; color: #9c9078; max-width: 150px; word-break: break-word; line-height: 1.4; }
+.pay-info b { color: #e8dcc4; font-weight: 600; }
+.tabs { padding: 0 24px 14px; display: flex; gap: 10px; }
+.btn-ghost { padding: 8px 14px; background: transparent; color: #c4a878; border: 1px solid rgba(196,168,120,0.5); border-radius: 3px; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; text-decoration: none; display: inline-block; }
+.btn-ghost:hover { background: rgba(196,168,120,0.12); }
+.actions .re { color: #c4a878; border-color: rgba(196,168,120,0.5); }
+.actions .re:hover { background: rgba(196,168,120,0.12); }
+
+</style>
+</head>
+<body>
+
+<div class="login-wrap" id="loginWrap">
+  <form class="login-box" id="loginForm">
+    <h1>ADMIN PANEL</h1>
+    <p class="sub">— COMIC 2026 —</p>
+    <div class="login-err" id="loginErr"></div>
+    <label>Password</label>
+    <input type="password" id="adminPass" required placeholder="Masukkan password admin" autocomplete="current-password">
+    <button type="submit">Masuk</button>
+  </form>
+</div>
+
+<div id="dash">
+  <header>
+    <h1>⚛ COMIC 2026 · DASHBOARD</h1>
+    <div class="right">
+      <span id="totalInfo">—</span>
+      <a id="logoutBtn">LOGOUT</a>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="lbl">Total</div><div class="val" id="sTotal">0</div></div>
+    <div class="stat"><div class="lbl">Tim</div><div class="val" id="sTeam">0</div></div>
+    <div class="stat" style="border-left-color:#e0c890;"><div class="lbl">Pending</div><div class="val" id="sPending" style="color:#e0c890;">0</div></div>
+    <div class="stat" style="border-left-color:#a0d4b8;"><div class="lbl">Verified</div><div class="val" id="sVerified" style="color:#a0d4b8;">0</div></div>
+    <div class="stat" style="border-left-color:#e8a0a0;"><div class="lbl">Rejected</div><div class="val" id="sRejected" style="color:#e8a0a0;">0</div></div>
+    <div class="stat" style="border-left-color:#d0a8e8;"><div class="lbl">Akun</div><div class="val" id="sUsers" style="color:#d0a8e8;">0</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="pill active" data-tab="reg">Pendaftaran</button>
+    <button class="pill" data-tab="users">Akun Terdaftar</button>
+  </div>
+
+  <!-- TAB PENDAFTARAN -->
+  <div id="tabReg">
+    <div class="toolbar">
+      <button class="pill active" data-filter="all">Semua</button>
+      <button class="pill" data-filter="pending">Pending</button>
+      <button class="pill" data-filter="verified">Verified</button>
+      <button class="pill" data-filter="rejected">Rejected</button>
+      <button class="pill" data-filter="flagged">⚠ Mencurigakan</button>
+      <input type="text" id="searchBox" placeholder="Cari nama/email/lomba/NISN/tim/kode/no.ref…">
+      <button class="btn-ghost" id="refreshBtn">↻ Muat Ulang</button>
+      <a class="btn-ghost" id="exportBtn" href="api/api.php?action=admin_export">⬇ Export CSV</a>
+      <button class="btn-danger" id="clearBtn">Hapus Semua</button>
+    </div>
+
+    <div class="wrap">
+      <table id="dataTable" style="display:none;">
+        <thead>
+          <tr>
+            <th>Kode</th><th>Tgl</th><th>Peserta</th><th>Lomba</th><th>Biaya</th>
+            <th>NISN/HP</th><th>Surat</th><th>IG1</th><th>IG2</th><th>Bayar</th>
+            <th>Status</th><th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="emptyMsg" style="display:none;">Belum ada data pendaftaran.</div>
+    </div>
+  </div>
+
+  <!-- TAB AKUN -->
+  <div id="tabUsers" style="display:none;">
+    <div class="toolbar">
+      <input type="text" id="userSearch" placeholder="Cari nama/email/sekolah…">
+      <button class="btn-ghost" id="refreshUsersBtn">↻ Muat Ulang</button>
+    </div>
+    <div class="wrap">
+      <table id="userTable">
+        <thead><tr><th>#</th><th>Nama</th><th>Email</th><th>Sekolah</th><th>Jenjang</th><th>Dibuat</th><th>Lomba Aktif</th></tr></thead>
+        <tbody id="userBody"></tbody>
+      </table>
+      <div class="empty" id="userEmpty" style="display:none;">Belum ada akun.</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="imgModal">
+  <div class="modal-box"><img id="imgModalContent" src="" alt=""></div>
+</div>
+
+<script src="api.js"></script>
+<script>
+const FILE_URL = (id, k) => COMIC_API.endpoint + "?action=file&id=" + id + "&k=" + k;
+
+let allRows = [];
+let allUsers = [];
+let currentFilter = "all";
+
+/* ── helper: panggil API, tangani sesi habis ── */
+async function api(action, opts) {
+  const r = await COMIC_API(action, opts);
+  if (r.error) {
+    if (r.error.code === "ADMIN_ONLY") showLogin();
+    throw new Error(r.error.msg);
+  }
+  return r;
+}
+
+/* ── LOGIN / LOGOUT ── */
+function showLogin() {
+  document.getElementById("dash").style.display = "none";
+  document.getElementById("loginWrap").style.display = "flex";
+}
+function showDashboard() {
+  document.getElementById("loginWrap").style.display = "none";
+  document.getElementById("dash").style.display = "block";
+  loadData();
+  loadUsers();
+}
+
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = document.getElementById("loginErr");
+  const btn = e.target.querySelector("button");
+  btn.disabled = true;
+  const r = await COMIC_API("admin_login", { data: { password: document.getElementById("adminPass").value } });
+  btn.disabled = false;
+  if (r.error) { err.textContent = r.error.msg; err.style.display = "block"; return; }
+  err.style.display = "none";
+  document.getElementById("adminPass").value = "";
+  showDashboard();
+});
+
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  if (!confirm("Logout dari panel admin?")) return;
+  await COMIC_API("admin_logout", { data: {} });
+  showLogin();
+});
+
+/* ── DATA ── */
+async function loadData() {
+  try {
+    const r = await api("admin_list");
+    allRows = r.rows || [];
+  } catch (e) {
+    console.error(e);
+    if (document.getElementById("dash").style.display !== "none") alert("Gagal memuat data: " + e.message);
+    allRows = [];
+  }
+  renderTable();
+}
+
+async function loadUsers() {
+  try {
+    const r = await api("admin_users");
+    allUsers = r.users || [];
+  } catch (e) { allUsers = []; }
+  renderUsers();
+}
+
+function renderTable() {
+  const stats = { total: allRows.length, team: 0, pending: 0, verified: 0, rejected: 0 };
+  allRows.forEach(r => {
+    if (r.is_team) stats.team++;
+    if (r.status === "pending") stats.pending++;
+    else if (r.status === "verified") stats.verified++;
+    else if (r.status === "rejected") stats.rejected++;
+  });
+  document.getElementById("sTotal").textContent = stats.total;
+  document.getElementById("sTeam").textContent = stats.team;
+  document.getElementById("sPending").textContent = stats.pending;
+  document.getElementById("sVerified").textContent = stats.verified;
+  document.getElementById("sRejected").textContent = stats.rejected;
+  document.getElementById("totalInfo").textContent = stats.total + " pendaftar";
+
+  const q = (document.getElementById("searchBox").value || "").toLowerCase();
+  const rows = allRows.filter(r => {
+    if (currentFilter === "flagged") { if (!r.flags.length) return false; }
+    else if (currentFilter !== "all" && r.status !== currentFilter) return false;
+    if (q) {
+      const hay = [r.name, r.email, r.lomba, r.reg_code, r.nisn, r.address, r.team_name, r.school, r.ref, r.sender, r.phone].join(" ").toLowerCase();
+      if (hay.indexOf(q) < 0) return false;
+    }
+    return true;
+  });
+
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+
+  if (rows.length === 0) {
+    document.getElementById("dataTable").style.display = "none";
+    document.getElementById("emptyMsg").style.display = "block";
+    return;
+  }
+
+  rows.forEach(r => {
+    const isTeam = !!r.is_team;
+    const members = Array.isArray(r.team_members) ? r.team_members : [];
+    const tr = document.createElement("tr");
+
+    const pesertaHtml = isTeam
+      ? '<strong style="color:#d0a8e8;">🏆 ' + esc(r.team_name) + '</strong>' +
+        '<span class="type-badge team">TIM</span>' +
+        '<div class="team-list"><strong>Ketua:</strong> ' + esc(r.name) + '<br>' +
+        '<strong>Anggota (' + members.length + '):</strong><br>' +
+        members.map((m, i) => '&nbsp;&nbsp;' + (i + 1) + '. ' + esc(m)).join('<br>') +
+        '</div>'
+      : '<strong style="color:#e8dcc4;">' + esc(r.name) + '</strong>' +
+        '<span class="type-badge indiv">INDIVIDU</span>';
+
+    const flagsHtml = (r.flags || []).map(f => '<div class="flag">⚠ ' + esc(f) + '</div>').join("");
+
+    tr.innerHTML =
+      '<td style="font-family:Courier New,monospace;font-size:11px;color:#c4a878;">' + esc(r.reg_code) + '</td>' +
+      '<td style="font-size:11px;white-space:nowrap;">' + formatDate(r.created_at) + '</td>' +
+      '<td>' + pesertaHtml +
+        '<div style="font-size:11px;color:#9c9078;margin-top:4px;">' + esc(r.email) + '<br>' + esc(r.school) + ' · ' + esc(r.level) + '</div>' +
+        flagsHtml + '</td>' +
+      '<td>' + esc(r.lomba) + '</td>' +
+      '<td style="font-family:Courier New,monospace;color:#c4a878;white-space:nowrap;">Rp ' + Number(r.lomba_price).toLocaleString("id-ID") + '</td>' +
+      '<td style="font-size:11.5px;">' +
+        (isTeam
+          ? '<span style="color:#7a705c;font-size:10.5px;">— tanpa NISN —</span><br><strong style="color:#e8dcc4;">' + esc(r.phone) + '</strong>'
+          : '<div style="font-family:Courier New,monospace;color:#e8dcc4;">' + esc(r.nisn || '') + '</div><div style="color:#e8dcc4;">' + esc(r.phone || '') + '</div>' +
+            (r.address ? '<div style="margin-top:6px;font-size:11px;color:#c4a878;max-width:220px;white-space:normal;">📍 ' + esc(r.address) + '</div>' : '')) +
+      '</td>' +
+      '<td>' + thumbCell(r, "surat") + '</td>' +
+      '<td>' + thumbCell(r, "ig1") + '</td>' +
+      '<td>' + thumbCell(r, "ig2") + '</td>' +
+      '<td>' + thumbCell(r, "pay") +
+        '<div class="pay-info">Pengirim: <b>' + esc(r.sender) + '</b><br>Ref: <b>' + esc(r.ref) + '</b></div></td>' +
+      '<td><span class="badge ' + esc(r.status) + '">' + esc(r.status) + '</span></td>' +
+      '<td><div class="actions">' +
+        (r.status !== "verified" ? '<button class="ok" data-id="' + r.id + '" data-act="verified">✓ Verif</button>' : '') +
+        (r.status !== "rejected" ? '<button class="no" data-id="' + r.id + '" data-act="rejected">✕ Tolak</button>' : '') +
+        (r.status !== "pending"  ? '<button class="re" data-id="' + r.id + '" data-act="pending">↺ Pending</button>' : '') +
+      '</div></td>';
+
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("emptyMsg").style.display = "none";
+  document.getElementById("dataTable").style.display = "table";
+}
+
+function renderUsers() {
+  document.getElementById("sUsers").textContent = allUsers.length;
+  const q = (document.getElementById("userSearch").value || "").toLowerCase();
+  const rows = allUsers.filter(u => !q || (u.name + " " + u.email + " " + u.school).toLowerCase().indexOf(q) >= 0);
+  const body = document.getElementById("userBody");
+  body.innerHTML = rows.map((u, i) =>
+    '<tr><td>' + (i + 1) + '</td>' +
+    '<td><strong style="color:#e8dcc4;">' + esc(u.name) + '</strong></td>' +
+    '<td>' + esc(u.email) + '</td>' +
+    '<td>' + esc(u.school) + '</td>' +
+    '<td>' + esc(u.level) + '</td>' +
+    '<td style="font-size:11px;white-space:nowrap;">' + formatDate(u.created_at) + '</td>' +
+    '<td>' + (u.reg_count > 0
+      ? '<span class="badge verified">' + u.reg_count + ' lomba</span>'
+      : '<span class="badge pending">belum daftar lomba</span>') + '</td></tr>'
+  ).join("");
+  document.getElementById("userEmpty").style.display = rows.length ? "none" : "block";
+  document.getElementById("userTable").style.display = rows.length ? "table" : "none";
+}
+
+function thumbCell(r, k) {
+  const f = r.files && r.files[k];
+  if (!f) return "";
+  const url = FILE_URL(r.id, k);
+  if (f.type === "application/pdf") {
+    return '<a href="' + url + '" target="_blank" rel="noopener" class="pdf-link">PDF</a>';
+  }
+  return '<img src="' + url + '" class="thumb" loading="lazy" onclick="showImg(this.src)" alt="">';
+}
+
+function formatDate(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("id-ID", { day:"2-digit", month:"2-digit", year:"2-digit" }) + " " +
+           d.toLocaleTimeString("id-ID", { hour:"2-digit", minute:"2-digit" });
+  } catch (e) { return iso; }
+}
+
+function showImg(src) {
+  document.getElementById("imgModalContent").src = src;
+  document.getElementById("imgModal").classList.add("active");
+}
+document.getElementById("imgModal").addEventListener("click", (e) => {
+  if (e.target.id === "imgModal") e.target.classList.remove("active");
+});
+
+/* ── AKSI VERIFIKASI ── */
+const ACT_TEXT = { verified: "Verifikasi pendaftaran ini?", rejected: "Tolak pendaftaran ini? (kuota akan dibebaskan)", pending: "Kembalikan ke status pending?" };
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const id = Number(btn.dataset.id);
+  const status = btn.dataset.act;
+  if (!confirm(ACT_TEXT[status])) return;
+
+  btn.disabled = true;
+  try {
+    await api("admin_status", { data: { id, status } });
+    await loadData();
+    loadUsers();
+  } catch (err) {
+    alert("Gagal mengubah status: " + err.message);
+    btn.disabled = false;
+  }
+});
+
+/* ── FILTER, TAB, CARI ── */
+document.querySelectorAll("[data-filter]").forEach(p => {
+  p.addEventListener("click", () => {
+    document.querySelectorAll("[data-filter]").forEach(x => x.classList.remove("active"));
+    p.classList.add("active");
+    currentFilter = p.dataset.filter;
+    renderTable();
+  });
+});
+document.querySelectorAll("[data-tab]").forEach(p => {
+  p.addEventListener("click", () => {
+    document.querySelectorAll("[data-tab]").forEach(x => x.classList.remove("active"));
+    p.classList.add("active");
+    const reg = p.dataset.tab === "reg";
+    document.getElementById("tabReg").style.display = reg ? "block" : "none";
+    document.getElementById("tabUsers").style.display = reg ? "none" : "block";
+  });
+});
+document.getElementById("searchBox").addEventListener("input", renderTable);
+document.getElementById("userSearch").addEventListener("input", renderUsers);
+document.getElementById("refreshBtn").addEventListener("click", loadData);
+document.getElementById("refreshUsersBtn").addEventListener("click", loadUsers);
+
+/* ── HAPUS SEMUA ── */
+document.getElementById("clearBtn").addEventListener("click", async () => {
+  if (!confirm("Hapus SEMUA data pendaftaran beserta berkas upload? Tidak bisa dibatalkan!")) return;
+  if (!confirm("Yakin? Data akan hilang permanen.")) return;
+  try {
+    await api("admin_delete_all", { data: { confirm: "HAPUS" } });
+    await loadData();
+    loadUsers();
+  } catch (err) {
+    alert("Gagal menghapus: " + err.message);
+  }
+});
+
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+/* ── AUTO LOGIN (kalau sesi admin masih aktif di server) ── */
+(async function () {
+  const r = await COMIC_API("me");
+  if (r && r.admin) showDashboard();
+})();
+</script>
+</body>
+</html>

@@ -63,7 +63,7 @@
 
   function openDB() {
     return new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      const req = indexedDB.open('comic2026').onsuccess = e => e.target.result.transaction('registrations').objectStore('registrations').getAll().onsuccess = r => console.table(r.target.result.map(x => ({lomba: x.lomba, status: x.status, sekolah: x.school})))
       req.onupgradeneeded = (e) => {
         const db = e.target.result;
         if (!db.objectStoreNames.contains(DB_STORE)) {

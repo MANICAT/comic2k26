@@ -114,6 +114,8 @@
      - 1 sekolah 1 peserta/tim (lomba yang bertanda oneSchool)
      Pendaftaran berstatus "rejected" tidak dihitung (kuota dibebaskan).
      ═══════════════════════════════════════════════════════ */
+  // 1 akun = 1 lomba, KECUALI Rangking 1 dan Olimpiade (boleh keduanya)
+  const MULTI_OK = ["Rangking 1", "Olimpiade"];
   const isActive = (r) => r.status !== "rejected";
   const normSchool = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const findLomba = (name) => LOMBA_DATA.find(l => l.name === name);
@@ -126,14 +128,17 @@
   }
 
   function checkRules(all, session, l, nisn) {
-    if (all.some(r => r.email === session.email && isActive(r)))
-      return { code: "ALREADY", msg: "Akun ini sudah terdaftar. Satu akun hanya bisa mendaftar satu kali." };
+    const mine = all.filter(r => r.email === session.email && isActive(r));
+    if (mine.some(r => r.lomba === l.name))
+      return { code: "ALREADY", msg: "Kamu sudah terdaftar di lomba " + l.name + "." };
+    if (mine.length && !(MULTI_OK.includes(l.name) && mine.every(r => MULTI_OK.includes(r.lomba))))
+      return { code: "ALREADY", msg: "Akun ini sudah terdaftar. Satu akun hanya bisa mendaftar satu lomba (kecuali Rangking 1 dan Olimpiade)." };
     const st = lombaStats(all, l, session.school);
     if (st.full)
       return { code: "FULL", msg: "Kuota " + l.name + " sudah penuh (" + l.quota + "). Pendaftaran lomba ini ditutup." };
     if (st.schoolTaken)
       return { code: "SCHOOL", msg: "Sekolahmu sudah mendaftarkan " + (l.team ? "tim" : "peserta") + " di " + l.name + ". Aturan: 1 sekolah 1 " + (l.team ? "tim" : "peserta") + "." };
-    if (!l.team && nisn && session.level !== "Umum" && all.some(r => isActive(r) && r.nisn === nisn))
+    if (!l.team && nisn && session.level !== "Umum" && all.some(r => isActive(r) && r.email !== session.email && r.nisn === nisn))
       return { code: "NISN", msg: "NISN ini sudah dipakai pada pendaftaran lain." };
     return null;
   }
@@ -202,8 +207,11 @@
     try { state.all = await dbGetAll(); } catch { state.all = []; }
 
     // Sudah pernah daftar -> tidak boleh daftar lagi
-    const mine = state.all.find(r => r.email === state.session.email && isActive(r));
-    if (mine) { showAlreadyRegistered(mine); return; }
+    const mine = state.all.filter(r => r.email === state.session.email && isActive(r));
+    const eligible = LOMBA_DATA.filter(l => l.levels.includes(state.session.level));
+    const canStillRegister = !mine.length ||
+      eligible.some(l => checkRules(state.all, state.session, l, "")?.code !== "ALREADY");
+    if (mine.length && !canStillRegister) { showAlreadyRegistered(mine); return; }
 
     renderDataPeserta();
     fillLombaOptions();
@@ -223,7 +231,7 @@
     });
   }
 
-  function showAlreadyRegistered(r) {
+  function showAlreadyRegistered(list) {
     const shell = document.querySelector(".reg-shell");
     shell.innerHTML =
       '<div class="reg-card step-panel active">' +
@@ -231,14 +239,21 @@
           '<div class="success-mark">✓</div>' +
           '<div class="reg-eyebrow">— IAM SCRIPTUS —</div>' +
           '<h2>Kamu Sudah Terdaftar</h2>' +
-          '<p class="reg-lede">Satu akun hanya bisa mendaftar satu kali. Ini data pendaftaranmu.</p>' +
-          '<div class="receipt" id="receipt"></div>' +
+          '<p class="reg-lede">Satu akun hanya bisa mendaftar satu lomba (kecuali Rangking 1 dan Olimpiade). Ini data pendaftaranmu.</p>' +
+          '<div id="receiptList"></div>' +
           '<div class="reg-actions" style="justify-content:center;">' +
             '<a href="index.html" class="reg-btn primary" style="text-decoration:none;text-align:center;">Kembali ke Beranda</a>' +
           '</div>' +
         '</div>' +
       '</div>';
-    renderReceipt(r);
+    const box = document.getElementById("receiptList");
+    list.forEach(r => {
+      const d = document.createElement("div");
+      d.className = "receipt";
+      d.style.marginBottom = "14px";
+      box.appendChild(d);
+      renderReceipt(r, d);
+    });
   }
 
   function preselectFromUrl() {
@@ -248,7 +263,7 @@
     const opt = Array.from(sel.options).find(o => o.value === want);
     if (opt && !opt.disabled) { sel.value = want; onLombaChange(want); }
     else document.getElementById("lombaHint").textContent =
-      "Lomba \"" + want + "\" tidak tersedia untukmu (beda jenjang, kuota penuh, atau sekolahmu sudah mendaftar).";
+      "Lomba \"" + want + "\" tidak tersedia untukmu (beda jenjang, kuota penuh, sekolahmu sudah mendaftar, atau akunmu sudah terdaftar di lomba lain).";
   }
 
   function goStep(n) {
@@ -282,13 +297,18 @@
       const opt = document.createElement("option");
       opt.value = l.name;
       const tag = l.team ? " [TIM " + l.team.total + " orang]" : "";
+      const rule = checkRules(state.all, state.session, l, "");
+      const blocked = rule && rule.code === "ALREADY";
+      const own = state.all.some(r => r.email === state.session.email && isActive(r) && r.lomba === l.name);
       let note = "";
-      if (st.full) note = " — DITUTUP (kuota penuh)";
+      if (own) note = " — sudah kamu daftar";
+      else if (blocked) note = " — tidak bisa (akun sudah terdaftar di lomba lain)";
+      else if (st.full) note = " — DITUTUP (kuota penuh)";
       else if (st.schoolTaken) note = " — sekolahmu sudah mendaftar";
       else if (st.left != null) note = " — sisa " + st.left + " kuota";
       opt.textContent = l.name + tag + " — Rp " + l.price.toLocaleString("id-ID") + note;
       opt.dataset.price = l.price;
-      if (st.full || st.schoolTaken) opt.disabled = true; else open++;
+      if (blocked || st.full || st.schoolTaken) opt.disabled = true; else open++;
       sel.appendChild(opt);
     });
 
@@ -626,7 +646,7 @@
     return "COMIC26-" + s;
   }
 
-  function renderReceipt(r) {
+  function renderReceipt(r, el) {
     const lines = [
       ["ID Pendaftaran", r.reg_code],
       ["Nama Ketua", r.name],
@@ -644,7 +664,7 @@
     lines.push(["Biaya", "Rp " + Number(r.lomba_price).toLocaleString("id-ID")]);
     lines.push(["Status", { verified: "Terverifikasi", rejected: "Ditolak" }[r.status] || "Menunggu Verifikasi Panitia"]);
 
-    document.getElementById("receipt").innerHTML = lines.map(([k, v]) =>
+    (el || document.getElementById("receipt")).innerHTML = lines.map(([k, v]) =>
       '<div class="r-line"><span>' + esc(k) + '</span><span>' + esc(v) + '</span></div>'
     ).join("");
   }

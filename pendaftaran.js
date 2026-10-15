@@ -6,27 +6,38 @@
 (function () {
   "use strict";
 
+  /* Aturan tiap lomba
+     team   : null = individu. Kalau tim: {min,max} = jumlah anggota SELAIN ketua, total = jumlah orang per tim.
+     quota  : batas maksimal pendaftar (null = tidak dibatasi). Kalau penuh, pendaftaran lomba ditutup.
+     oneSchool : true = 1 sekolah hanya boleh 1 peserta/tim di lomba ini. */
+  const TIM = (total) => ({ min: total - 1, max: total - 1, total });
+
   const LOMBA_DATA = [
-    { name:"Mewarnai",              price:20000,  levels:["TK/RA"],                    team:null },
-    { name:"Fashion Show",          price:20000,  levels:["TK/RA"],                    team:null },
-    { name:"Cerdas Cermat",         price:75000,  levels:["SD/MI"],                    team:{min:2,max:3} },
-    { name:"Hitung Cepat",          price:15000,  levels:["SD/MI"],                    team:null },
-    { name:"Olimpiade",             price:20000,  levels:["SD/MI"],                    team:null },
-    { name:"Tahfidz",               price:20000,  levels:["SD/MI"],                    team:null },
-    { name:"Menggambar/Mendongeng", price:20000,  levels:["SD/MI"],                    team:null },
-    { name:"Vocal Solo",            price:50000,  levels:["SMP/MTs"],                  team:null },
-    { name:"Story Telling",         price:20000,  levels:["SMP/MTs"],                  team:null },
-    { name:"Cerdas Cermat",         price:75000,  levels:["SMP/MTs"],                  team:{min:2,max:3} },
-    { name:"Olimpiade",             price:20000,  levels:["SMP/MTs"],                  team:null },
-    { name:"Hitung Cepat",          price:15000,  levels:["SMP/MTs"],                  team:null },
-    { name:"Ranking 1",             price:15000,  levels:["SMP/MTs"],                  team:null },
-    { name:"Volly Ball",            price:150000, levels:["SMA/MA"],                   team:{min:6,max:12} },
-    { name:"Badminton",             price:90000,  levels:["SMA/MA"],                   team:{min:1,max:2} },
-    { name:"Cerdas Cermat",         price:75000,  levels:["SMA/MA"],                   team:{min:2,max:3} },
-    { name:"Syarhil Qur'an",        price:75000,  levels:["SMA/MA"],                   team:{min:2,max:3} },
-    { name:"Essay",                 price:30000,  levels:["SMA/MA","Umum"],            team:null },
-    { name:"E-Sport",               price:100000, levels:["SMA/MA","Umum"],            team:{min:4,max:6} },
-    { name:"Fotografi",             price:30000,  levels:["Umum","SMA/MA","SMP/MTs"],  team:null }
+    // TK/RA
+    { name:"Mewarnai",     price:20000,  levels:["TK/RA"],    team:null,    quota:null },
+    { name:"Fashion Show", price:20000,  levels:["TK/RA"],    team:null,    quota:null },
+    // SD/MI
+    { name:"Tahfizh",      price:20000,  levels:["SD/MI"],    team:null,    quota:null },
+    { name:"Mendongeng",   price:20000,  levels:["SD/MI"],    team:null,    quota:null },
+    // SMP/MTs
+    { name:"Vocal Solo",   price:50000,  levels:["SMP/MTs"],  team:null,    quota:30,   oneSchool:true },
+    { name:"Story Telling",price:20000,  levels:["SMP/MTs"],  team:null,    quota:null },
+    { name:"Rangking 1",   price:15000,  levels:["SMP/MTs"],  team:null,    quota:null },
+    // SMA/MA
+    { name:"Volly",        price:150000, levels:["SMA/MA"],   team:TIM(10), quota:16,   oneSchool:true },
+    { name:"Badminton",    price:90000,  levels:["SMA/MA"],   team:null,    quota:16,   oneSchool:true },
+    { name:"Syarhil",      price:75000,  levels:["SMA/MA"],   team:TIM(3),  quota:null },
+    { name:"Essay",        price:30000,  levels:["SMA/MA"],   team:null,    quota:null },
+    { name:"E-Sport",      price:100000, levels:["SMA/MA"],   team:TIM(5),  quota:32,   oneSchool:true },
+    // Lintas jenjang
+    { name:"Hitung Cepat", price:15000,  levels:["SD/MI","SMP/MTs","SMA/MA"], team:null, quota:null },
+    { name:"Olimpiade",    price:20000,  levels:["SD/MI","SMP/MTs"],          team:null, quota:null },
+    // CC: kuota 16 tim per kategori jenjang
+    { name:"CC SD",        price:75000,  levels:["SD/MI"],    team:TIM(3),  quota:16,   oneSchool:true },
+    { name:"CC SMP",       price:75000,  levels:["SMP/MTs"],  team:TIM(3),  quota:16,   oneSchool:true },
+    { name:"CC SMA",       price:75000,  levels:["SMA/MA"],   team:TIM(3),  quota:16,   oneSchool:true },
+    // Umum
+    { name:"Fotografi",    price:30000,  levels:["Umum"],     team:null,    quota:null }
   ];
 
   const SESSION_KEY = "comic2026_session";
@@ -34,11 +45,11 @@
 
   const state = {
     session: null,
-    taken: [],
+    all: [],
     lomba: "",
     lombaPrice: 0,
     isTeam: false,
-    teamMin: 0, teamMax: 0,
+    teamMin: 0, teamMax: 0, teamTotal: 0,
     teamMembers: [],
     files: { surat: null, ig1: null, ig2: null, pay: null }
   };
@@ -67,13 +78,22 @@
     });
   }
 
-  async function dbAdd(record) {
+  /* Cek aturan + simpan dalam SATU transaksi, supaya tidak bisa
+     lolos kalau ada dua pendaftaran masuk bersamaan (mis. dua tab). */
+  async function dbAddChecked(record, check) {
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(DB_STORE, "readwrite");
-      const req = tx.objectStore(DB_STORE).add(record);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
+      const store = tx.objectStore(DB_STORE);
+      const getReq = store.getAll();
+      getReq.onsuccess = () => {
+        const problem = check(getReq.result || []);
+        if (problem) { resolve({ error: problem }); return; }
+        store.add(record);
+      };
+      tx.oncomplete = () => resolve({ ok: true });
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error("Transaksi dibatalkan"));
     });
   }
 
@@ -85,6 +105,37 @@
       req.onsuccess = () => resolve(req.result || []);
       req.onerror = () => reject(req.error);
     });
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     ATURAN PENDAFTARAN
+     - 1 akun hanya boleh daftar 1 kali
+     - kuota penuh  -> pendaftaran lomba ditutup
+     - 1 sekolah 1 peserta/tim (lomba yang bertanda oneSchool)
+     Pendaftaran berstatus "rejected" tidak dihitung (kuota dibebaskan).
+     ═══════════════════════════════════════════════════════ */
+  const isActive = (r) => r.status !== "rejected";
+  const normSchool = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const findLomba = (name) => LOMBA_DATA.find(l => l.name === name);
+
+  function lombaStats(all, l, school) {
+    const active = all.filter(r => r.lomba === l.name && isActive(r));
+    const full = l.quota != null && active.length >= l.quota;
+    const schoolTaken = !!l.oneSchool && active.some(r => normSchool(r.school) === normSchool(school));
+    return { count: active.length, full, schoolTaken, left: l.quota != null ? l.quota - active.length : null };
+  }
+
+  function checkRules(all, session, l, nisn) {
+    if (all.some(r => r.email === session.email && isActive(r)))
+      return { code: "ALREADY", msg: "Akun ini sudah terdaftar. Satu akun hanya bisa mendaftar satu kali." };
+    const st = lombaStats(all, l, session.school);
+    if (st.full)
+      return { code: "FULL", msg: "Kuota " + l.name + " sudah penuh (" + l.quota + "). Pendaftaran lomba ini ditutup." };
+    if (st.schoolTaken)
+      return { code: "SCHOOL", msg: "Sekolahmu sudah mendaftarkan " + (l.team ? "tim" : "peserta") + " di " + l.name + ". Aturan: 1 sekolah 1 " + (l.team ? "tim" : "peserta") + "." };
+    if (!l.team && nisn && session.level !== "Umum" && all.some(r => isActive(r) && r.nisn === nisn))
+      return { code: "NISN", msg: "NISN ini sudah dipakai pada pendaftaran lain." };
+    return null;
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -147,14 +198,16 @@
       location.href = "index.html"; return;
     }
 
-    // Ambil riwayat lomba yang sudah didaftar (dari IndexedDB)
-    try {
-      const all = await dbGetAll();
-      state.taken = all.filter(r => r.email === state.session.email).map(r => r.lomba);
-    } catch { state.taken = []; }
+    // Ambil semua pendaftaran (untuk cek kuota & riwayat akun)
+    try { state.all = await dbGetAll(); } catch { state.all = []; }
+
+    // Sudah pernah daftar -> tidak boleh daftar lagi
+    const mine = state.all.find(r => r.email === state.session.email && isActive(r));
+    if (mine) { showAlreadyRegistered(mine); return; }
 
     renderDataPeserta();
     fillLombaOptions();
+    preselectFromUrl();
     bindStep1();
     bindUploads();
     bindPayment();
@@ -168,6 +221,34 @@
       document.getElementById("payAmount").textContent = "Rp " + state.lombaPrice.toLocaleString("id-ID");
       goStep(3);
     });
+  }
+
+  function showAlreadyRegistered(r) {
+    const shell = document.querySelector(".reg-shell");
+    shell.innerHTML =
+      '<div class="reg-card step-panel active">' +
+        '<div class="success-wrap">' +
+          '<div class="success-mark">✓</div>' +
+          '<div class="reg-eyebrow">— IAM SCRIPTUS —</div>' +
+          '<h2>Kamu Sudah Terdaftar</h2>' +
+          '<p class="reg-lede">Satu akun hanya bisa mendaftar satu kali. Ini data pendaftaranmu.</p>' +
+          '<div class="receipt" id="receipt"></div>' +
+          '<div class="reg-actions" style="justify-content:center;">' +
+            '<a href="index.html" class="reg-btn primary" style="text-decoration:none;text-align:center;">Kembali ke Beranda</a>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    renderReceipt(r);
+  }
+
+  function preselectFromUrl() {
+    const want = new URLSearchParams(location.search).get("lomba");
+    if (!want) return;
+    const sel = document.getElementById("regLomba");
+    const opt = Array.from(sel.options).find(o => o.value === want);
+    if (opt && !opt.disabled) { sel.value = want; onLombaChange(want); }
+    else document.getElementById("lombaHint").textContent =
+      "Lomba \"" + want + "\" tidak tersedia untukmu (beda jenjang, kuota penuh, atau sekolahmu sudah mendaftar).";
   }
 
   function goStep(n) {
@@ -193,31 +274,35 @@
   function fillLombaOptions() {
     const sel = document.getElementById("regLomba");
     const eligible = LOMBA_DATA.filter(l => l.levels.includes(state.session.level));
-    const takenSet = new Set(state.taken);
 
     sel.innerHTML = '<option value="">-- Pilih Bidang Lomba --</option>';
+    let open = 0;
     eligible.forEach(l => {
+      const st = lombaStats(state.all, l, state.session.school);
       const opt = document.createElement("option");
       opt.value = l.name;
-      const taken = takenSet.has(l.name);
-      const tag = l.team ? " [TIM]" : "";
-      opt.textContent = l.name + tag + " — Rp " + l.price.toLocaleString("id-ID") + (taken ? " (Sudah terdaftar)" : "");
+      const tag = l.team ? " [TIM " + l.team.total + " orang]" : "";
+      let note = "";
+      if (st.full) note = " — DITUTUP (kuota penuh)";
+      else if (st.schoolTaken) note = " — sekolahmu sudah mendaftar";
+      else if (st.left != null) note = " — sisa " + st.left + " kuota";
+      opt.textContent = l.name + tag + " — Rp " + l.price.toLocaleString("id-ID") + note;
       opt.dataset.price = l.price;
-      if (taken) opt.disabled = true;
+      if (st.full || st.schoolTaken) opt.disabled = true; else open++;
       sel.appendChild(opt);
     });
 
     const hint = document.getElementById("lombaHint");
     hint.textContent = eligible.length === 0
       ? "Tidak ada lomba untuk jenjangmu."
-      : eligible.length + " lomba tersedia untuk jenjang " + state.session.level + ".";
+      : open + " dari " + eligible.length + " lomba masih terbuka untuk jenjang " + state.session.level + ".";
   }
 
   function bindStep1() {
     const sel = document.getElementById("regLomba");
     sel.addEventListener("change", () => onLombaChange(sel.value));
 
-    document.getElementById("toStep2").addEventListener("click", () => {
+    document.getElementById("toStep2").addEventListener("click", async () => {
       const v = sel.value;
       if (!v) return shake(sel);
       const opt = sel.selectedOptions[0];
@@ -227,10 +312,8 @@
         const tn = document.getElementById("regTeamName").value.trim();
         const ph = document.getElementById("regPhoneTeam").value.trim();
         if (!tn) return shake(document.getElementById("regTeamName"));
-        if (state.teamMembers.length < state.teamMin)
-          return alert("Tim butuh minimal " + state.teamMin + " anggota (selain ketua).");
-        if (state.teamMembers.length > state.teamMax)
-          return alert("Maksimal " + state.teamMax + " anggota.");
+        if (state.teamMembers.length !== state.teamMin)
+          return alert("Tim " + state.lomba + " harus berisi tepat " + state.teamTotal + " orang: kamu (ketua) + " + state.teamMin + " anggota.");
         if (state.teamMembers.some(n => !n.trim())) return alert("Semua nama anggota wajib diisi.");
         const lower = state.teamMembers.map(n => n.trim().toLowerCase());
         if ([...new Set(lower)].length !== lower.length) return alert("Nama anggota tidak boleh sama.");
@@ -242,6 +325,17 @@
         const ph = document.getElementById("regPhone").value.trim();
         if (!/^\d{10}$/.test(nisn)) return shake(document.getElementById("regNisn"));
         if (!validPhone(ph)) return shake(document.getElementById("regPhone"));
+      }
+
+      // Cek ulang kuota/aturan dengan data terbaru sebelum lanjut
+      try { state.all = await dbGetAll(); } catch (e) {}
+      const nisnVal = state.isTeam ? "" : document.getElementById("regNisn").value.trim();
+      const problem = checkRules(state.all, state.session, findLomba(v), nisnVal);
+      if (problem) {
+        alert(problem.msg);
+        if (problem.code === "ALREADY") return location.reload();
+        if (problem.code !== "NISN") { fillLombaOptions(); sel.value = ""; onLombaChange(""); }
+        return;
       }
       goStep(2);
     });
@@ -265,41 +359,46 @@
     pp.hidden = false;
 
     if (state.isTeam) {
-      state.teamMin = l.team.min; state.teamMax = l.team.max;
+      state.teamMin = l.team.min; state.teamMax = l.team.max; state.teamTotal = l.team.total;
       fInd.hidden = true; fTim.hidden = false;
       document.getElementById("regTeamName").value = "";
       document.getElementById("regPhoneTeam").value = "";
-      state.teamMembers = [];
+      state.teamMembers = Array(l.team.min).fill("");
       renderTeamMembers();
       document.getElementById("teamHint").textContent =
-        "Butuh " + l.team.min + "–" + l.team.max + " anggota (selain kamu sebagai ketua).";
+        "Tim " + l.name + " terdiri dari " + l.team.total + " orang. Kolom 1 adalah kamu (ketua), isi " + l.team.min + " kolom lainnya dengan nama anggota.";
     } else {
       fInd.hidden = false; fTim.hidden = true;
     }
   }
 
+  /* Jumlah kolom = jumlah orang per tim.
+     Kolom 1 = ketua (otomatis dari akun, terkunci), sisanya diisi nama anggota. */
   function renderTeamMembers() {
     const list = document.getElementById("teamMembersList");
     const addBtn = document.getElementById("addMemberBtn");
     list.innerHTML = "";
+
+    const lead = document.createElement("div");
+    lead.className = "team-member-row";
+    lead.innerHTML =
+      '<span class="member-num">1</span>' +
+      '<input type="text" value="' + esc(state.session.name) + ' (Ketua)" disabled>';
+    list.appendChild(lead);
+
     state.teamMembers.forEach((name, i) => {
       const row = document.createElement("div");
       row.className = "team-member-row";
       row.innerHTML =
-        '<span class="member-num">' + (i + 1) + '</span>' +
-        '<input type="text" placeholder="Nama anggota ' + (i + 1) + '" value="' + esc(name) + '" maxlength="120">' +
-        '<button type="button" class="member-remove">✕</button>';
+        '<span class="member-num">' + (i + 2) + '</span>' +
+        '<input type="text" placeholder="Nama anggota ' + (i + 2) + '" value="' + esc(name) + '" maxlength="120">';
       const inp = row.querySelector("input");
       inp.addEventListener("input", () => state.teamMembers[i] = inp.value);
-      row.querySelector(".member-remove").addEventListener("click", () => {
-        state.teamMembers.splice(i, 1); renderTeamMembers();
-      });
       list.appendChild(row);
     });
-    addBtn.disabled = state.teamMembers.length >= state.teamMax;
-    addBtn.textContent = state.teamMembers.length >= state.teamMax
-      ? "Maksimum " + state.teamMax + " anggota tercapai"
-      : "+ Tambah Anggota (" + state.teamMembers.length + "/" + state.teamMax + ")";
+
+    // Ukuran tim tetap -> tidak perlu tombol tambah
+    addBtn.hidden = true;
   }
 
   document.addEventListener("click", (e) => {
@@ -494,7 +593,21 @@
         created_at: new Date().toISOString()
       };
 
-      await dbAdd(record);
+      const res = await dbAddChecked(record, (all) =>
+        checkRules(all, state.session, findLomba(state.lomba), record.nisn));
+
+      if (res.error) {
+        alert(res.error.msg);
+        btn.disabled = false;
+        btn.textContent = "Kirim Pendaftaran →";
+        if (res.error.code === "ALREADY") return location.reload();
+        try { state.all = await dbGetAll(); } catch (e) {}
+        fillLombaOptions();
+        document.getElementById("regLomba").value = "";
+        onLombaChange("");
+        goStep(1);
+        return;
+      }
 
       renderReceipt(record);
       goStep(4);
@@ -527,8 +640,9 @@
     } else {
       lines.push(["NISN", r.nisn]);
     }
-    lines.push(["Biaya", "Rp " + r.lomba_price.toLocaleString("id-ID")]);
-    lines.push(["Status", "Menunggu Verifikasi Panitia"]);
+    lines.push(["Sekolah", r.school]);
+    lines.push(["Biaya", "Rp " + Number(r.lomba_price).toLocaleString("id-ID")]);
+    lines.push(["Status", { verified: "Terverifikasi", rejected: "Ditolak" }[r.status] || "Menunggu Verifikasi Panitia"]);
 
     document.getElementById("receipt").innerHTML = lines.map(([k, v]) =>
       '<div class="r-line"><span>' + esc(k) + '</span><span>' + esc(v) + '</span></div>'
